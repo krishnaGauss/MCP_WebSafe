@@ -1,0 +1,27 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
+  "name": "io.github.krishnaGauss/geo-shield",
+  "title": "GEO Shield",
+  "description": "Detects hidden AI prompt injection, AI recommendation poisoning, sneaky redirects and hidden spam.",
+  "repository": {
+    "url": "https://github.com/krishnaGauss/MCP_WebSafe",
+    "source": "github"
+  },
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "geo-shield-mcp",
+      "version": "0.1.0",
+      "runtimeHint": "npx",
+      "transport": { "type": "stdio" },
+      "runtimeArguments": [{ "type": "positional", "value": "-y" }],
+      "environmentVariables": [
+        { "name": "GEO_SHIELD_DB_PATH", "description": "SQLite file for stored scans (default ~/.geo-shield/geo-shield.db).", "isRequired": false },
+        { "name": "GEO_SHIELD_RETENTION_DAYS", "description": "Days to keep stored scans (default 30, 0 = forever).", "isRequired": false },
+        { "name": "GEO_SHIELD_ALLOWED_PORTS", "description": "Extra destination ports to allow besides 80 and 443, comma separated.", "isRequired": false }
+      ]
+    }
+  ]
+}

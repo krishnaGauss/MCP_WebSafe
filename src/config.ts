@@ -1,3 +1,4 @@
+import os from 'node:os';
 import path from 'node:path';
 
 export interface SecurityPolicy {
@@ -40,7 +41,8 @@ export function loadConfig(): Config {
     if (n > 0 && n < 65536) ports.add(n);
   }
   return {
-    dbPath: path.resolve(process.env.GEO_SHIELD_DB_PATH ?? path.join(process.cwd(), 'data', 'geo-shield.db')),
+    // Default under the home directory: MCP clients launch servers from arbitrary (often read-only) working directories.
+    dbPath: path.resolve(process.env.GEO_SHIELD_DB_PATH || path.join(os.homedir(), '.geo-shield', 'geo-shield.db')),
     logLevel: process.env.GEO_SHIELD_LOG_LEVEL ?? 'info',
     fetchTimeoutMs: intEnv('GEO_SHIELD_FETCH_TIMEOUT_MS', 10_000),
     maxBodyBytes: intEnv('GEO_SHIELD_MAX_BODY_BYTES', 2 * 1024 * 1024),

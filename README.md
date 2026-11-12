@@ -1,6 +1,8 @@
 # GEO Shield MCP
 
-A defensive, read-only MCP server that lets Claude inspect websites for manipulation aimed at search engines and **AI assistants**: sneaky and open redirects, hidden text and links, injected spam, hijacked metadata, hidden prompt-injection text, and "Summarise with AI" links whose prefilled prompts try to plant instructions in a visitor's assistant ("AI recommendation poisoning").
+[![npm](https://img.shields.io/npm/v/geo-shield-mcp)](https://www.npmjs.com/package/geo-shield-mcp) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+A defensive, read-only MCP server that lets AI agents (Claude, Gemini CLI, Cursor, VS Code Copilot, Codex and others) inspect websites for manipulation aimed at search engines and **AI assistants**: sneaky and open redirects, hidden text and links, injected spam, hijacked metadata, hidden prompt-injection text, and "Summarise with AI" links whose prefilled prompts try to plant instructions in a visitor's assistant ("AI recommendation poisoning").
 
 Every finding is produced by a deterministic rule and backed by evidence: location, visibility state, an excerpt, severity and confidence (kept separate), remediation, and false-positive notes. Scanned content is always treated as untrusted data.
 
@@ -8,39 +10,83 @@ Every finding is produced by a deterministic rule and backed by evidence: locati
 
 ## Install
 
-Requires Node.js ≥ 22.12 (uses the built-in `node:sqlite`).
-
-```bash
-npm install
-```
-
-```bash
-npm run build
-```
+Requires **Node.js ≥ 22.12** (it uses the built-in `node:sqlite`). No API keys are needed. Every client below runs the same command: `npx -y geo-shield-mcp`.
 
 ### Claude Code
 
 ```bash
-claude mcp add geo-shield -- node /Users/krish/Code/MCP_WebSafe/dist/index.js
+claude mcp add geo-shield -s user -- npx -y geo-shield-mcp
 ```
 
-### Claude Desktop
+### Gemini CLI
 
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+```bash
+gemini mcp add geo-shield npx -y geo-shield-mcp
+```
+
+### OpenAI Codex CLI
+
+```bash
+codex mcp add geo-shield -- npx -y geo-shield-mcp
+```
+
+### Claude Desktop, Cursor, Windsurf, Antigravity
+
+These clients use the same JSON shape:
+
+| Client | Config file |
+|---|---|
+| Claude Desktop | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows) |
+| Cursor | `~/.cursor/mcp.json` |
+| Windsurf | `~/.codeium/windsurf/mcp_config.json` |
+| Antigravity | `~/.gemini/antigravity/mcp_config.json` |
 
 ```json
 {
   "mcpServers": {
     "geo-shield": {
-      "command": "node",
-      "args": ["/Users/krish/Code/MCP_WebSafe/dist/index.js"],
-      "env": { "GEO_SHIELD_DB_PATH": "/Users/krish/Code/MCP_WebSafe/data/geo-shield.db" }
+      "command": "npx",
+      "args": ["-y", "geo-shield-mcp"]
     }
   }
 }
 ```
 
-Then ask Claude, for example: *"Use geo_scan_url on https://example.com and explain anything suspicious"*, or run the `investigate_ai_injection` prompt.
+### VS Code (GitHub Copilot agent mode)
+
+`.vscode/mcp.json`:
+
+```json
+{
+  "servers": {
+    "geo-shield": { "type": "stdio", "command": "npx", "args": ["-y", "geo-shield-mcp"] }
+  }
+}
+```
+
+### ChatGPT and other web apps
+
+Web apps such as ChatGPT can only connect to **remote** MCP servers over HTTPS. This release runs locally over stdio, so it works with the desktop, CLI and IDE agents above. A hosted HTTP version is planned.
+
+### From source
+
+```bash
+git clone https://github.com/krishnaGauss/MCP_WebSafe.git && cd MCP_WebSafe && npm install && npm run build
+```
+
+Then point your client at `node /absolute/path/to/MCP_WebSafe/dist/index.js` instead of `npx -y geo-shield-mcp`.
+
+## Usage
+
+Ask your agent in plain language:
+
+- *"Scan https://example.com with geo_scan_url and explain anything suspicious."*
+- *"Trace where this link really goes: https://…"*
+- *"Check https://… for hidden AI prompt injection."* (or run the `investigate_ai_injection` prompt)
+- *"Scan it again as a mobile browser and as a search crawler. Does the content change?"*
+- *"Give me the full markdown report for scan_…"*
+
+Scans are stored locally in `~/.geo-shield/geo-shield.db` and purged after 30 days by default.
 
 ## Tools
 
@@ -115,6 +161,18 @@ The tests cover:
 - SSRF bypass attempts
 - unit tests for each rule
 - an end-to-end MCP client/server test
+
+### Releasing
+
+1. Bump the version in `package.json`, `server.json` (twice) and `SERVER_INFO` in `src/mcp/server.ts`. A test fails if they disagree.
+2. Publish to npm. `prepublishOnly` runs type-check, lint, tests and build first:
+   ```bash
+   npm publish
+   ```
+3. Publish to the MCP Registry:
+   ```bash
+   mcp-publisher login github && mcp-publisher publish
+   ```
 
 ## Architecture
 

@@ -1,15 +1,41 @@
 {
   "name": "geo-shield-mcp",
   "version": "0.1.0",
-  "description": "Defensive MCP server that detects website manipulation aimed at search engines and AI assistants (GEO integrity scanner).",
-  "type": "module",
+  "mcpName": "io.github.krishnaGauss/geo-shield",
+  "description": "Defensive MCP server that detects website manipulation aimed at search engines and AI assistants: hidden prompt injection, AI recommendation poisoning links, sneaky redirects, hidden spam.",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "security",
+    "prompt-injection",
+    "seo",
+    "geo",
+    "generative-engine-optimization",
+    "cloaking",
+    "open-redirect",
+    "ai-safety",
+    "claude"
+  ],
+  "homepage": "https://github.com/krishnaGauss/MCP_WebSafe#readme",
+  "bugs": {
+    "url": "https://github.com/krishnaGauss/MCP_WebSafe/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/krishnaGauss/MCP_WebSafe.git"
+  },
+  "author": "krishnaGauss",
   "license": "MIT",
+  "type": "module",
   "bin": {
     "geo-shield-mcp": "dist/index.js"
   },
   "main": "dist/index.js",
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "engines": {
     "node": ">=22.12"
@@ -24,7 +50,8 @@
     "test:watch": "vitest",
     "fixtures": "node --experimental-strip-types tests/fixtures/serve.ts",
     "demo": "node --experimental-strip-types scripts/demo.ts",
-    "inspect": "npx @modelcontextprotocol/inspector node dist/index.js"
+    "inspect": "npx @modelcontextprotocol/inspector node dist/index.js",
+    "prepublishOnly": "npm run typecheck && npm run lint && npm test && npm run build"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.4.0",
