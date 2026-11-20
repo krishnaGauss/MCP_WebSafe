@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.1
+
+### Fixed
+- Plain AI instructions in `data-*` attributes and the page `<title>` are now reported (AI-002). 0.2.0 scanned these places only for obfuscated or encoded instructions, so a plain or partly obfuscated instruction there was missed.
+- A page could hide an encoded payload behind a few hundred junk blobs, because decoding stopped after 200 blobs. The limit is now 5,000 blobs or 1.5 s per page.
+- `data-*` attributes beyond the 500th were never scanned; the cap is now 5,000.
+- When either limit is reached, the scan now says so in its notices instead of skipping content silently.
+
 ## 0.2.0
 
 ### Added

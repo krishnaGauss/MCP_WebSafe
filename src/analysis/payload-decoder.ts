@@ -22,9 +22,22 @@ export interface DecodedPayload {
 export interface DecodeBudget {
   remaining: number;
   deadline: number;
+  /** Set when decoding stopped early, so the scan can say that some blobs were not examined. */
+  exhausted: boolean;
 }
 
-export const newDecodeBudget = (blobs = 200, ms = 400): DecodeBudget => ({ remaining: blobs, deadline: Date.now() + ms });
+/**
+ * Decoding one blob takes microseconds, so the limits are high: they exist only to stop pathological
+ * pages. A low limit would let a page hide a payload behind a few hundred junk blobs.
+ */
+export const DEFAULT_DECODE_BLOBS = 5000;
+export const DEFAULT_DECODE_MS = 1500;
+
+export const newDecodeBudget = (blobs = DEFAULT_DECODE_BLOBS, ms = DEFAULT_DECODE_MS): DecodeBudget => ({
+  remaining: blobs,
+  deadline: Date.now() + ms,
+  exhausted: false,
+});
 
 const MAX_ENCODED = 8192;
 const MAX_DECODED = 4096;
@@ -117,7 +130,10 @@ export function findEncodedPayloads(text: string, budget: DecodeBudget = newDeco
     re.lastIndex = 0;
     let m: RegExpExecArray | null;
     while ((m = re.exec(text))) {
-      if (budget.remaining <= 0 || Date.now() > budget.deadline) return out;
+      if (budget.remaining <= 0 || Date.now() > budget.deadline) {
+        budget.exhausted = true;
+        return out;
+      }
       const blob = m[0];
       const start = m.index;
       if (claimed.some(([a, b]) => start >= a && start < b)) continue;

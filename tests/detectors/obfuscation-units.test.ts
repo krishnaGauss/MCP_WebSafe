@@ -136,6 +136,7 @@ describe('encoded payloads', () => {
     const text = Array.from({ length: 20 }, () => randomBase64(48)).join(' ');
     findEncodedPayloads(text, budget);
     expect(budget.remaining).toBe(0);
+    expect(budget.exhausted).toBe(true);
   });
 });
 

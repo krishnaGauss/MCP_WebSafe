@@ -7,6 +7,8 @@ export interface DetectorContext {
   /** Present only when the final response was HTML. */
   page?: PageSnapshot;
   declaredRedirects: DeclaredRedirect[];
+  /** Scan-level notices a detector can add (e.g. analysis limits reached). */
+  notes?: string[];
 }
 
 export interface Detector {

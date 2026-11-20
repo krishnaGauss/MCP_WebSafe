@@ -2,7 +2,7 @@ import type { InstructionAssessment } from '../analysis/ai-patterns.js';
 import { collectTextChannels, type TextChannel } from '../analysis/channels.js';
 import { assessText } from '../analysis/deobfuscate.js';
 import type { SpamMatch } from '../analysis/keywords.js';
-import { newDecodeBudget } from '../analysis/payload-decoder.js';
+import { DEFAULT_DECODE_BLOBS, newDecodeBudget } from '../analysis/payload-decoder.js';
 import { describeCodepoints, findBidiOverrides } from '../analysis/unicode-smuggling.js';
 import { excerptAround, makeFinding, sanitizeExcerpt } from '../risk/evidence.js';
 import type { Detector } from '../types/detector.js';
@@ -131,6 +131,11 @@ export const unicodeObfuscationDetector: Detector = {
           }),
         );
       }
+    }
+    if (budget.exhausted) {
+      ctx.notes?.push(
+        `Encoded-payload analysis stopped early: the page contains more than ${DEFAULT_DECODE_BLOBS} candidate encoded blobs or took too long to decode, so some blobs were not examined for AI-009. An unusually large number of encoded blobs can itself be an attempt to hide a payload.`,
+      );
     }
     return [...findings['AI-007'], ...findings['AI-008'], ...findings['AI-009']];
   },

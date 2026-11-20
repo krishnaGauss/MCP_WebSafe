@@ -73,11 +73,16 @@ export interface PageSnapshot {
   attributes: AttributeText[];
   /** data-* attributes (other than data-ai/llm/prompt) with values of 16+ characters, raw. */
   data_attributes: AttributeText[];
+  /** True when the page had more data-* attributes than are collected (MAX_DATA_ATTRIBUTES). */
+  data_attributes_truncated: boolean;
   hidden_elements: HiddenElement[];
   visible_text: string;
   page_hash: string;
   text_fingerprint: string;
 }
+
+/** Upper bound on collected data-* attributes; a page exceeding it gets a scan notice. */
+export const MAX_DATA_ATTRIBUTES = 5000;
 
 const collapse = (s: string): string => s.replace(/\s+/g, ' ').trim();
 
@@ -246,9 +251,13 @@ export function parseHtml(html: string, pageUrl: string): PageSnapshot {
 
   // Every other data-* attribute with a meaningful value: a common carrier for encoded or smuggled payloads.
   const dataAttributes: AttributeText[] = [];
+  let dataAttributesTruncated = false;
   const NAMED = new Set(['data-ai', 'data-llm', 'data-prompt']);
   for (const el of $('*').toArray()) {
-    if (dataAttributes.length >= 500) break;
+    if (dataAttributes.length >= MAX_DATA_ATTRIBUTES) {
+      dataAttributesTruncated = true;
+      break;
+    }
     const e = el as Element;
     for (const [attribute, value] of Object.entries(e.attribs ?? {})) {
       if (!attribute.startsWith('data-') || NAMED.has(attribute) || !value || value.trim().length < 16) continue;
@@ -305,6 +314,7 @@ export function parseHtml(html: string, pageUrl: string): PageSnapshot {
     iframes,
     attributes,
     data_attributes: dataAttributes,
+    data_attributes_truncated: dataAttributesTruncated,
     hidden_elements: hiddenElements,
     visible_text: visibleText,
     page_hash: createHash('sha256').update(html).digest('hex'),

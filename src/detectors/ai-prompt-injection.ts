@@ -41,10 +41,14 @@ export const aiPromptInjectionDetector: Detector = {
       );
     }
 
-    // AI-002 comments, attributes, metadata, JSON-LD
+    // AI-002 comments, attributes (including every data-* attribute), title, metadata, JSON-LD.
+    // These must cover every channel the obfuscation detector scans, because AI-008 only reports
+    // text whose plain form does NOT already match.
     const channels: Array<{ source: EvidenceSource; location: string; text: string; hidden?: boolean }> = [
+      ...(page.title ? [{ source: 'meta' as const, location: 'head > title', text: page.title }] : []),
       ...page.comments.map((c) => ({ source: 'comment' as const, location: c.location, text: c.text })),
       ...page.attributes.map((at) => ({ source: 'attribute' as const, location: `${at.selector} [${at.attribute}]`, text: at.value, hidden: at.hidden })),
+      ...page.data_attributes.map((d) => ({ source: 'attribute' as const, location: `${d.selector} [${d.attribute}]`, text: d.value, hidden: true })),
       ...page.meta.map((m) => ({ source: 'meta' as const, location: `${m.selector} (${m.key})`, text: m.content })),
       ...page.json_ld.flatMap((j) =>
         j.parsed !== undefined
