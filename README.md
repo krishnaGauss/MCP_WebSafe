@@ -215,18 +215,3 @@ src/
 ```
 
 The scanner engine is independent of MCP: `ScanOrchestrator` can be reused by a CLI or CI job.
-
-## Limitations
-
-- **Static analysis only:** no JavaScript rendering, and external stylesheets aren't fetched. Visibility is inferred from inline styles, `<style>` blocks and attributes.
-- **Simulated contexts:** request contexts are simulations, not verified crawler behaviour.
-- **No baseline yet:** without a stored baseline, a scan can't tell when content was added.
-- **Indicators, not verdicts:** findings call for investigation. They aren't proof of intent or of a search-policy violation.
-- **No ingestion proof:** a page scan can't show that any AI model ingested or remembered the content.
-
-## Pending
-
-- Phase 3 · `geo_compare_page_variants` (cloaking diff across contexts), Playwright rendering
-- Phase 4 · `geo_scan_site` (sitemap + scoped crawl with authorisation), baselines, `geo_diff_baseline`
-- Phase 4/5 · `geo_audit_ugc`, `geo_inspect_ai_content` as a focused tool, memory-poisoning consistency checks
-- Phase 6 · historical comparison, finding annotations, `geo://domain/{domain}/baseline`
