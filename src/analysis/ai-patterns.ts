@@ -123,3 +123,29 @@ export function extractAiPrefill(url: URL): { assistant: string; param: string; 
 }
 
 export const AI_LINK_RE = /https?:\/\/(?:www\.)?(?:chatgpt\.com|chat\.openai\.com|claude\.ai|perplexity\.ai|gemini\.google\.com|copilot\.microsoft\.com|bing\.com\/(?:chat|copilotsearch)|grok\.com|x\.com\/i\/grok|meta\.ai|chat\.mistral\.ai|chat\.deepseek\.com|you\.com|poe\.com)[^\s"'<>`)]*/gi;
+
+/**
+ * Patterns for text whose word boundaries were destroyed (e.g. "i g n o r e  a l l" after HTML collapses
+ * whitespace and the spaced letters are joined). Matched against lowercase letters only.
+ */
+const COMPACT_PATTERNS: Array<{ family: InstructionFamily; re: RegExp }> = [
+  { family: 'override', re: /(ignore|disregard|forget|override)(all|any|the|your)?(previous|prior|above|earlier|preceding|system|original)(instructions?|prompts?|rules|guidelines)/ },
+  { family: 'persistence', re: /(remember|memori[sz]e|store|save)[a-z]{0,60}?(inyourmemory|tomemory|intomemory|futureconversations|futurechats)/ },
+  { family: 'exfiltration', re: /(reveal|print|show|disclose|leak)(your|the)(systemprompt|initialinstructions|hiddeninstructions|developermessage)/ },
+  { family: 'suppression', re: /(donot|dont|never)(mention|recommend|cite|suggest)[a-z]{0,30}?(competitors?|otherbrands|alternatives)/ },
+  { family: 'recommendation', re: /(always|must|only)(recommend|suggest|cite|promote|endorse)/ },
+  { family: 'ai_address', re: /(dear|noteto|notefor|attention|hey)(the)?(ai|llms?|chatgpt|claude|gemini|copilot|assistants?)/ },
+];
+
+export function assessCompact(text: string): InstructionAssessment {
+  const compact = text.toLowerCase().replace(/[^a-z]/g, '').slice(0, 4000);
+  const matches: InstructionMatch[] = [];
+  for (const { family, re } of COMPACT_PATTERNS) {
+    const m = re.exec(compact);
+    if (m) matches.push({ family, match: m[0], index: 0 });
+  }
+  const families = [...new Set(matches.map((m) => m.family))];
+  const strong = families.some((f) => STRONG.has(f));
+  const flagged = strong || families.length >= 2;
+  return { flagged, families, matches, strong, confidence: families.length >= 2 ? 'high' : strong ? 'medium' : 'low' };
+}

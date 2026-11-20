@@ -4,10 +4,12 @@ import { registrableDomain } from '../analysis/url-utils.js';
 import type { Config } from '../config.js';
 import { aiPromptInjectionDetector } from '../detectors/ai-prompt-injection.js';
 import { hiddenContentDetector } from '../detectors/hidden-content.js';
+import { bidiOverrideDetector, unicodeObfuscationDetector } from '../detectors/obfuscation.js';
 import { extractDeclaredRedirects, redirectAbuseDetector } from '../detectors/redirect-abuse.js';
 import { spamInjectionDetector } from '../detectors/spam-injection.js';
 import { GeoShieldError, toGeoShieldError } from '../errors.js';
 import { logger } from '../logger.js';
+import { deepStripInvisible } from '../risk/evidence.js';
 import { sortFindings, summarizeRisk } from '../risk/scoring.js';
 import { validateTargetUrl } from '../security/ssrf-protection.js';
 import type { ScansRepository } from '../storage/scans.repository.js';
@@ -153,7 +155,7 @@ export class ScanOrchestrator {
         findings: [],
         risk: summarizeRisk([]),
       };
-      this.repo.save(report);
+      this.repo.save(deepStripInvisible(report));
       throw new GeoShieldError(e.code, e.message, { scan_id: scanId, ...(hops.length ? { redirect_chain: hops } : {}) });
     }
 
@@ -166,8 +168,8 @@ export class ScanOrchestrator {
     const ctx: DetectorContext = { fetch, ...(page ? { page } : {}), declaredRedirects };
     const detectors: Detector[] = [];
     if (opts.check_redirects) detectors.push(redirectAbuseDetector);
-    if (opts.check_hidden_content) detectors.push(hiddenContentDetector, spamInjectionDetector);
-    if (opts.check_ai_injection) detectors.push(aiPromptInjectionDetector);
+    if (opts.check_hidden_content) detectors.push(hiddenContentDetector, spamInjectionDetector, bidiOverrideDetector);
+    if (opts.check_ai_injection) detectors.push(aiPromptInjectionDetector, unicodeObfuscationDetector);
 
     const drafts: DraftFinding[] = [];
     for (const d of detectors) {
@@ -192,8 +194,9 @@ export class ScanOrchestrator {
       findings,
       risk: summarizeRisk(findings),
     };
-    this.repo.save(report, page);
-    return report;
+    const clean = deepStripInvisible(report);
+    this.repo.save(clean, page);
+    return clean;
   }
 
   /** Redirect chain reconstruction only (headers; bodies are read only to find meta/JS redirects on the final page). */
@@ -232,7 +235,7 @@ export class ScanOrchestrator {
         ...base, redirect_chain: hops, declared_redirects: [], completed_at: new Date().toISOString(), status: 'failed',
         error: { code: e.code, message: e.message }, findings: [], risk: summarizeRisk([]),
       };
-      this.repo.save(report);
+      this.repo.save(deepStripInvisible(report));
       throw new GeoShieldError(e.code, e.message, { scan_id: scanId, ...(hops.length ? { redirect_chain: hops } : {}) });
     }
     const page = fetch.body && isHtml(fetch) ? parseHtml(fetch.body, fetch.final_url) : undefined;
@@ -252,7 +255,8 @@ export class ScanOrchestrator {
       findings,
       risk: summarizeRisk(findings),
     };
-    this.repo.save(report);
-    return report;
+    const clean = deepStripInvisible(report);
+    this.repo.save(clean);
+    return clean;
   }
 }

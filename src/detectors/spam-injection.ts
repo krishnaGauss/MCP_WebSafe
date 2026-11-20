@@ -1,4 +1,5 @@
 import { matchSpamKeywords, spamTopicCounts, TOPIC_THRESHOLD, type SpamCategory } from '../analysis/keywords.js';
+import { foldForMatching } from '../analysis/text-normalizer.js';
 import { isCrossSite, registrableDomain } from '../analysis/url-utils.js';
 import { excerptAround, makeFinding } from '../risk/evidence.js';
 import type { Detector } from '../types/detector.js';
@@ -31,9 +32,10 @@ export const spamInjectionDetector: Detector = {
     const byCategory = new Map<SpamCategory, Evidence[]>();
     for (const link of page.links) {
       if (!link.external || link.hidden) continue; // hidden ones are HID-002
-      for (const m of matchSpamKeywords(`${link.text} ${link.title ?? ''} ${link.href}`)) {
+      const linkFold = foldForMatching(`${link.text} ${link.title ?? ''}`);
+      for (const m of matchSpamKeywords(`${linkFold.folded} ${link.href}`)) {
         const list = byCategory.get(m.category) ?? [];
-        list.push({ location: link.selector, source: 'link', excerpt: link.text || link.href, details: { href: link.href, domain: link.domain, matched: m.terms } });
+        list.push({ location: link.selector, source: 'link', excerpt: link.text || link.href, details: { href: link.href, domain: link.domain, matched: m.terms, ...(linkFold.transforms.length ? { obfuscation: linkFold.transforms } : {}) } });
         byCategory.set(m.category, list);
       }
     }
@@ -108,7 +110,7 @@ export const spamInjectionDetector: Detector = {
     const metaEvidence: Evidence[] = [];
     let offTopic = false;
     for (const src of metaSources) {
-      const matches = matchSpamKeywords(src.value);
+      const matches = matchSpamKeywords(foldForMatching(src.value).folded);
       if (!matches.length) continue;
       const visibleCounts = spamTopicCounts(page.visible_text);
       if (matches.some((m) => visibleCounts[m.category] === 0)) offTopic = true;

@@ -1,6 +1,6 @@
 {
   "name": "geo-shield-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "mcpName": "io.github.krishnaGauss/geo-shield",
   "description": "Defensive MCP server that detects website manipulation aimed at search engines and AI assistants: hidden prompt injection, AI recommendation poisoning links, sneaky redirects, hidden spam.",
   "keywords": [
@@ -33,9 +33,10 @@
   },
   "main": "dist/index.js",
   "files": [
-    "dist",
+    "CHANGELOG.md",
+    "LICENSE",
     "README.md",
-    "LICENSE"
+    "dist"
   ],
   "engines": {
     "node": ">=22.12"

@@ -1,6 +1,7 @@
 import type { CallToolResult } from '@modelcontextprotocol/server';
 import { toGeoShieldError } from '../errors.js';
 import { logger } from '../logger.js';
+import { deepStripInvisible, stripInvisible } from '../risk/evidence.js';
 import type { Finding } from '../types/finding.js';
 import type { ScanReport } from '../types/scan.js';
 
@@ -11,7 +12,9 @@ export const READ_ONLY_ANNOTATIONS = {
   openWorldHint: true,
 } as const;
 
-export function jsonResult(payload: Record<string, unknown>): CallToolResult {
+export function jsonResult(input: Record<string, unknown>): CallToolResult {
+  // Final guard: nothing invisible from a scanned page may reach the agent through a tool result.
+  const payload = deepStripInvisible(input);
   return {
     content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
     structuredContent: payload,
@@ -22,7 +25,7 @@ export function jsonResult(payload: Record<string, unknown>): CallToolResult {
 export function errorResult(err: unknown, tool: string): CallToolResult {
   const e = toGeoShieldError(err);
   if (e.code === 'INTERNAL_ERROR' || e.code === 'FETCH_FAILED') logger.warn({ tool, err }, 'tool error');
-  const payload = { error: e.toJSON() };
+  const payload = deepStripInvisible({ error: e.toJSON() });
   return { isError: true, content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }], structuredContent: payload };
 }
 
@@ -66,4 +69,9 @@ export function scanResponse(report: ScanReport): Record<string, unknown> {
     limitations: report.limitations,
     next_steps: `Full evidence and remediation: geo_get_report { "scan_id": "${report.scan_id}", "format": "markdown" }`,
   };
+}
+
+/** Plain-text tool result (markdown reports), with invisible characters removed. */
+export function textResult(text: string): CallToolResult {
+  return { content: [{ type: 'text', text: text.split('\n').map(stripInvisible).join('\n') }] };
 }

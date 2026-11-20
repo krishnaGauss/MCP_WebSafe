@@ -7,20 +7,39 @@
     "url": "https://github.com/krishnaGauss/MCP_WebSafe",
     "source": "github"
   },
-  "version": "0.1.0",
+  "version": "0.2.0",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "geo-shield-mcp",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "runtimeHint": "npx",
-      "transport": { "type": "stdio" },
-      "runtimeArguments": [{ "type": "positional", "value": "-y" }],
+      "transport": {
+        "type": "stdio"
+      },
+      "runtimeArguments": [
+        {
+          "type": "positional",
+          "value": "-y"
+        }
+      ],
       "environmentVariables": [
-        { "name": "GEO_SHIELD_DB_PATH", "description": "SQLite file for stored scans (default ~/.geo-shield/geo-shield.db).", "isRequired": false },
-        { "name": "GEO_SHIELD_RETENTION_DAYS", "description": "Days to keep stored scans (default 30, 0 = forever).", "isRequired": false },
-        { "name": "GEO_SHIELD_ALLOWED_PORTS", "description": "Extra destination ports to allow besides 80 and 443, comma separated.", "isRequired": false }
+        {
+          "name": "GEO_SHIELD_DB_PATH",
+          "description": "SQLite file for stored scans (default ~/.geo-shield/geo-shield.db).",
+          "isRequired": false
+        },
+        {
+          "name": "GEO_SHIELD_RETENTION_DAYS",
+          "description": "Days to keep stored scans (default 30, 0 = forever).",
+          "isRequired": false
+        },
+        {
+          "name": "GEO_SHIELD_ALLOWED_PORTS",
+          "description": "Extra destination ports to allow besides 80 and 443, comma separated.",
+          "isRequired": false
+        }
       ]
     }
   ]

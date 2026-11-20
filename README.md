@@ -6,7 +6,7 @@ A defensive, read-only MCP server that lets AI agents (Claude, Gemini CLI, Curso
 
 Every finding is produced by a deterministic rule and backed by evidence: location, visibility state, an excerpt, severity and confidence (kept separate), remediation, and false-positive notes. Scanned content is always treated as untrusted data.
 
-> **Status: Milestone 1.** `geo_scan_url`, `geo_trace_redirects` and `geo_get_report` are implemented and tested. See [Pending](#pending) for later phases.
+> **Status: 0.2.0.** `geo_scan_url`, `geo_trace_redirects` and `geo_get_report` are implemented and tested, including detection of invisible-Unicode smuggling and obfuscated or encoded AI instructions. See [Pending](#pending) for later phases.
 
 ## Install
 
@@ -101,14 +101,15 @@ Request contexts: `desktop_browser`, `mobile_browser`, `search_referrer`, `crawl
 **Resources:** `geo://taxonomy`, `geo://rules`, `geo://rules/{rule_id}`, `geo://scan/{scan_id}`, `geo://domain/{domain}/history`
 **Prompts:** `investigate_redirect`, `investigate_ai_injection`, `review_scan_findings`
 
-## Rules (Milestone 1)
+## Rules
 
 | Category | Rules |
 |---|---|
 | Redirects / cloaking | RED-001 cross-domain redirect · RED-002 open-redirect observed · RED-003 on-page redirect endpoint with external target · RED-004 meta-refresh/JS navigation off-site · RED-005 loop · RED-006 link text shows a different domain · RED-007 HTTPS→HTTP · RED-008 referrer/UA-conditional JS redirect |
-| Hidden content | HID-001 hidden text · HID-002 hidden external links · HID-003 off-screen · HID-004 same-colour text · HID-005 tiny/zero-size |
+| Hidden content | HID-001 hidden text · HID-002 hidden external links · HID-003 off-screen · HID-004 same-colour text · HID-005 tiny/zero-size · HID-006 bidi override in left-to-right text |
 | Spam / integrity | SPM-001 spam-keyword outbound links · SPM-002 hidden/unexpected iframe · SPM-003 obfuscated inline script · MET-001 spam keywords in title/metadata · MET-002 cross-domain canonical |
 | AI context | AI-001 hidden AI instructions · AI-002 instructions in comments/attributes/meta/JSON-LD · AI-003 instructions in visible text · AI-004 manipulative AI-assistant prefill link · AI-005 benign prefill link (info) · AI-006 unverifiable AI endorsement claims |
+| Obfuscation (0.2.0) | AI-007 text smuggled in invisible Unicode (tag characters, variation selectors, zero-width binary) · AI-008 instructions hidden by look-alike letters, fullwidth, leetspeak, spaced letters, invisible characters or right-to-left reversal · AI-009 base64/hex/percent/JS-escaped payloads that decode to instructions or spam |
 
 Full definitions (detection logic, severity mapping, remediation, false positives) are served at `geo://rules`.
 
@@ -117,6 +118,8 @@ Full definitions (detection logic, severity mapping, remediation, false positive
 - Text hidden by a UI toggle (`display:none`, `opacity:0`, `hidden`) is informational unless its content is suspicious.
 - Same-colour checks use the colour the text actually inherits, and are marked "unconfirmed" when no background is declared or the text sits next to an image.
 - AI-instruction patterns work in families (override, persistence, exfiltration, suppression, recommendation, AI-address). Visible text needs corroborating families before it is flagged.
+- De-obfuscation is used only for matching; reports show the original text. Look-alike letters are folded only inside words that mix Latin with another script, or inside mostly-Latin text, so ordinary Russian, Greek or Armenian text is never rewritten. Emoji flags and sequences, presentation selectors, ZWJ/ZWNJ in Persian and Indic scripts, and direction marks in right-to-left text are recognised as legitimate.
+- Encoded blobs are reported only when their decoded text matches instruction or spam patterns. `data:` URIs, JWTs, hashes, nonces, images, fonts and archives are skipped.
 
 ## Security design
 
@@ -129,7 +132,7 @@ Full definitions (detection logic, severity mapping, remediation, false positive
 - **Redirects:** followed manually and re-validated on every hop, with loop detection, a timeout, and a body cap (oversized bodies are truncated and flagged).
 - **No execution:** scripts are never run, and links and "Summarise with AI" buttons are inspected statically, never followed.
 - **Untrusted output:**
-  - Excerpts are stripped of control, zero-width and bidi characters, then truncated.
+  - Every string in a report and every tool result is stripped of invisible characters (controls, zero-width and bidi characters, Unicode tag characters, variation selectors, private-use and lone surrogates), so a scanned page cannot smuggle hidden instructions to the agent through GEO Shield's own output. Decoded hidden text is shown as visible text, with the original code points listed as `U+…` notation.
   - The markdown report wraps excerpts in code spans they can't break out of.
   - Every tool result carries an untrusted-content notice.
 - **Privacy and logging:** `Set-Cookie` values are never stored, and logs go to stderr only.

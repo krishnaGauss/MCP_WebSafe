@@ -1,5 +1,6 @@
 import { assessInstructions } from '../analysis/ai-patterns.js';
 import { matchSpamKeywords } from '../analysis/keywords.js';
+import { foldForMatching } from '../analysis/text-normalizer.js';
 import { isCrossSite, registrableDomain } from '../analysis/url-utils.js';
 import { WEAK_COLOUR_REASON } from '../analysis/visibility.js';
 import { makeFinding } from '../risk/evidence.js';
@@ -33,10 +34,13 @@ export const hiddenContentDetector: Detector = {
     for (const el of page.hidden_elements) {
       const reasonText = el.reasons.length ? el.reasons.join('; ') : 'hidden';
       // Hidden AI instructions are reported by the AI detector (AI-001); avoid duplicates.
-      if (assessInstructions(el.text).flagged) continue;
+      // Obfuscated variants are reported by the obfuscation detector (AI-008).
+      const folded = foldForMatching(el.text).folded;
+      if (assessInstructions(el.text).flagged || assessInstructions(folded).flagged) continue;
 
       const externalLinks = el.links.filter((href) => /^https?:/i.test(href) && isCrossSite(href, page.url));
-      const spam = matchSpamKeywords(`${el.text} ${externalLinks.join(' ')}`);
+      // Match on the de-obfuscated text too, so look-alike spelling (e.g. Cyrillic letters in "casino") is caught.
+      const spam = matchSpamKeywords(`${folded} ${externalLinks.join(' ')}`);
       const suspicious = spam.length > 0;
       // Colour matching against an undeclared (default) background is weak: the text may sit on an image
       // or on a background from an external stylesheet. Only report it when the content is itself suspicious.
@@ -87,7 +91,7 @@ export const hiddenContentDetector: Detector = {
     // Visible-but-tiny external links.
     const tiny = page.links.filter((l) => l.tiny && !l.hidden && l.external);
     if (tiny.length) {
-      const spam = tiny.some((l) => matchSpamKeywords(`${l.text} ${l.href}`).length);
+      const spam = tiny.some((l) => matchSpamKeywords(`${foldForMatching(l.text).folded} ${l.href}`).length);
       findings.push(
         makeFinding('HID-005', {
           severity: spam ? 'high' : 'medium',

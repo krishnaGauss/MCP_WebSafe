@@ -4,17 +4,38 @@ import type { Confidence, DraftFinding, Evidence, Severity } from '../types/find
 const MAX_EXCERPT = 300;
 
 /**
+ * Characters that render as nothing or change rendering order: C0/C1 controls, every Unicode format
+ * character (zero-width, bidi controls, Unicode tag characters used for "ASCII smuggling", soft hyphen),
+ * variation selectors and private-use code points. Scanned text passed to an AI agent must never contain
+ * these, or a page could smuggle instructions through GEO Shield's own output.
+ */
+// \p{Cs} also removes lone surrogates left when an excerpt is cut next to an astral-plane character.
+const INVISIBLE_RE = /[\p{Cc}\p{Cf}\p{Co}\p{Cs}\u{FE00}-\u{FE0F}\u{E0100}-\u{E01EF}]/gu;
+
+/** Removes invisible characters while keeping line breaks and tabs. */
+export function stripInvisible(text: string): string {
+  return text.replace(/[\t\n\r]/g, ' ').replace(INVISIBLE_RE, '');
+}
+
+/** Applies {@link stripInvisible} to every string in a JSON-like value (reports and tool results). */
+export function deepStripInvisible<T>(value: T): T {
+  if (typeof value === 'string') return stripInvisible(value) as T;
+  if (Array.isArray(value)) return value.map((v) => deepStripInvisible(v)) as T;
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) out[k] = deepStripInvisible(v);
+    return out as T;
+  }
+  return value;
+}
+
+/**
  * Prepare scanned content for inclusion in a report. The result is still UNTRUSTED data:
- * this only strips control/bidi characters (which can hide text from human reviewers),
- * collapses whitespace and truncates.
+ * this only strips invisible characters (which can hide text from human reviewers and smuggle
+ * instructions to models), collapses whitespace and truncates.
  */
 export function sanitizeExcerpt(text: string, max = MAX_EXCERPT): string {
-  const cleaned = text
-    // C0/C1 controls, zero-width and bidi override characters.
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u206F\uFEFF]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+  const cleaned = text.replace(/\s+/g, ' ').replace(INVISIBLE_RE, '').trim();
   return cleaned.length > max ? `${cleaned.slice(0, max - 1)}…` : cleaned;
 }
 

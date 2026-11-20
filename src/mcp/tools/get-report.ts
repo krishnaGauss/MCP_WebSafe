@@ -3,7 +3,7 @@ import * as z from 'zod';
 import { GeoShieldError } from '../../errors.js';
 import { renderMarkdownReport } from '../../reports/markdown-report.js';
 import type { ScansRepository } from '../../storage/scans.repository.js';
-import { errorResult, jsonResult } from '../tool-helpers.js';
+import { errorResult, jsonResult, textResult } from '../tool-helpers.js';
 
 export const getReportInput = z.object({
   scan_id: z.string().regex(/^scan_[0-9]{14}_[0-9a-f]{8}$/, 'scan_id looks like scan_YYYYMMDDHHMMSS_xxxxxxxx'),
@@ -25,7 +25,7 @@ export function registerGetReport(server: McpServer, repo: ScansRepository): voi
       try {
         const report = repo.get(scan_id);
         if (!report) throw new GeoShieldError('NOT_FOUND', `No scan with id ${scan_id} exists (it may have been purged by the retention policy).`);
-        if (format === 'markdown') return { content: [{ type: 'text', text: renderMarkdownReport(report) }] };
+        if (format === 'markdown') return textResult(renderMarkdownReport(report));
         return jsonResult(report as unknown as Record<string, unknown>);
       } catch (err) {
         return errorResult(err, 'geo_get_report');
