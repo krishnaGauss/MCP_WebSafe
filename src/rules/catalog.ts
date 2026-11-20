@@ -291,6 +291,52 @@ export const RULES: RuleDefinition[] = [
     false_positive_considerations: 'Genuine press coverage or awards may be described similarly.',
   }),
 
+  // ── Obfuscation and smuggling (0.2.0) ────────────────────────────────────────
+  r({
+    rule_id: 'AI-007', category: 'ai_prompt_injection', status: 'implemented',
+    title: 'Text smuggled in invisible Unicode characters',
+    description: 'Readable text is encoded in characters that render as nothing: Unicode tag characters ("ASCII smuggling"), runs of variation selectors after a visible character, or zero-width characters used as binary.',
+    detection: 'Invisible code points are grouped into runs and decoded (tag → ASCII, selectors → bytes, two-symbol zero-width → bits). Emoji subdivision flags, single presentation selectors and single joiners are ignored.',
+    default_severity: 'medium', default_confidence: 'high',
+    severity_mapping: 'critical when the decoded text asks for memory persistence or data exfiltration; high for other AI instructions or spam; medium for other substantial text in tag characters; low for short payloads in selectors or zero-width binary (often copy-tracking watermarks).',
+    potential_impact: 'Language models read these characters even though people and most review tools cannot see them, so a page can carry complete instructions that no human reviewer will notice.',
+    recommendation: 'Find where the characters enter the page (templates, CMS fields, third-party widgets) and strip Unicode tag characters and selector runs from user-facing content.',
+    false_positive_considerations: 'Some publishers embed invisible copy-tracking watermarks; these decode to short IDs rather than sentences and are reported at low severity.',
+  }),
+  r({
+    rule_id: 'AI-008', category: 'ai_prompt_injection', status: 'implemented',
+    title: 'Obfuscated AI-directed instructions',
+    description: 'Text matches AI-instruction patterns only after de-obfuscation: look-alike letters from other scripts, fullwidth or mathematical letters, leetspeak, spaced-out letters, invisible characters inside words, or right-to-left override reversal.',
+    detection: 'Text is folded for matching (NFKC, curated confusables inside Latin words, leetspeak inside mixed tokens, spaced-letter collapse, invisible-character removal, override reversal) and the instruction patterns are re-run. Reported only when the original text did not already match.',
+    default_severity: 'high', default_confidence: 'medium',
+    severity_mapping: 'critical for persistence or exfiltration instructions; high otherwise. Confidence high when two or more obfuscation techniques or pattern families are involved.',
+    potential_impact: 'Deliberate obfuscation is used to slip instructions past filters while language models still read them correctly.',
+    recommendation: 'Remove the instructions. Obfuscation indicates intent, so audit how the content was added.',
+    false_positive_considerations: 'Look-alike folding only applies inside words mixing Latin with another script, or inside mostly-Latin text, so ordinary Cyrillic, Greek or Armenian text is not affected; a full instruction phrase is still required.',
+  }),
+  r({
+    rule_id: 'AI-009', category: 'ai_prompt_injection', status: 'implemented',
+    title: 'Encoded AI instructions or spam payload',
+    description: 'A base64, hex, percent-encoded or JavaScript-escaped blob decodes (up to two layers) to AI instructions or high-risk commercial spam.',
+    detection: 'Blobs in hidden text, comments, attributes, data-* attributes, metadata, JSON-LD and AI prefill prompts are decoded. data: URIs, JWTs, binary formats (images, fonts, archives) and unreadable results are skipped. Decoding alone is never reported.',
+    default_severity: 'high', default_confidence: 'medium',
+    severity_mapping: 'critical for persistence or exfiltration instructions; high for other instructions or spam. Confidence high when a strong instruction family matches.',
+    potential_impact: 'Encoded instructions are designed for AI agents and tools that decode content, while staying unreadable to human reviewers and keyword filters.',
+    recommendation: 'Remove the payload and find which script, plugin or CMS field introduced it.',
+    false_positive_considerations: 'Configuration blobs can legitimately contain base64; only payloads whose decoded text matches instruction or spam patterns are reported.',
+  }),
+  r({
+    rule_id: 'HID-006', category: 'hidden_content', status: 'implemented',
+    title: 'Bidirectional override characters in left-to-right text',
+    description: 'LEFT-TO-RIGHT or RIGHT-TO-LEFT OVERRIDE characters appear in text containing no right-to-left script, so the text displays in a different order than it is stored ("Trojan Source").',
+    detection: 'U+202D/U+202E in a text channel with no Arabic, Hebrew, Syriac, Thaana, NKo or Adlam characters. Marks, embeddings and isolates are not reported.',
+    default_severity: 'medium', default_confidence: 'medium',
+    severity_mapping: 'medium; high when the reordered segment contains AI instructions or spam.',
+    potential_impact: 'People and AI systems read different text: a reviewer sees one order, a model or filter processes another. Also used to disguise file names and links.',
+    recommendation: 'Remove override characters from left-to-right content and sanitise user input for bidi controls.',
+    false_positive_considerations: 'Pages quoting right-to-left text are excluded when the script appears in the same text; demonstrations of the technique on security sites will match.',
+  }),
+
   // ── Planned (later milestones) ───────────────────────────────────────────────
   r({
     rule_id: 'CLK-001', category: 'cloaking', status: 'planned',

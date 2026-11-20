@@ -1,11 +1,5 @@
-import {
-  AI_LINK_RE,
-  assessInstructions,
-  extractAiPrefill,
-  findEndorsementClaims,
-  type InstructionAssessment,
-} from '../analysis/ai-patterns.js';
-import { resolveUrl } from '../analysis/url-utils.js';
+import { assessInstructions, findEndorsementClaims, type InstructionAssessment } from '../analysis/ai-patterns.js';
+import { chunks, collectAiPrefills, flattenStrings } from '../analysis/channels.js';
 import { excerptAround, makeFinding, raiseSeverity } from '../risk/evidence.js';
 import type { Detector } from '../types/detector.js';
 import type { DraftFinding, Evidence, EvidenceSource, Severity } from '../types/finding.js';
@@ -23,24 +17,6 @@ function matchExcerpt(text: string, a: InstructionAssessment): string {
 
 function severityFor(a: InstructionAssessment, base: Severity): Severity {
   return a.families.includes('persistence') || a.families.includes('exfiltration') ? raiseSeverity(base) : base;
-}
-
-/** Flattens JSON-LD into (path, string) pairs. */
-function flattenStrings(value: unknown, path = '$', out: Array<{ path: string; text: string }> = []): Array<{ path: string; text: string }> {
-  if (typeof value === 'string') out.push({ path, text: value });
-  else if (Array.isArray(value)) value.forEach((v, i) => flattenStrings(v, `${path}[${i}]`, out));
-  else if (value && typeof value === 'object') for (const [k, v] of Object.entries(value)) flattenStrings(v, `${path}.${k}`, out);
-  return out;
-}
-
-/** Splits text into sentence-ish chunks so each visible finding has a focused excerpt. */
-function chunks(text: string): string[] {
-  return text.split(/(?<=[.!?])\s+(?=[A-Z"'([])/).reduce<string[]>((acc, s) => {
-    const last = acc[acc.length - 1];
-    if (last !== undefined && last.length < 120) acc[acc.length - 1] = `${last} ${s}`;
-    else acc.push(s);
-    return acc;
-  }, []);
 }
 
 export const aiPromptInjectionDetector: Detector = {
@@ -118,22 +94,10 @@ export const aiPromptInjectionDetector: Detector = {
       );
     }
 
-    // AI-004 / AI-005 AI assistant links with prefilled prompts
-    const seen = new Set<string>();
-    const candidates: Array<{ href: string; text: string; location: string; source: EvidenceSource }> = page.links
-      .filter((l) => l.is_http)
-      .map((l) => ({ href: l.href, text: l.text, location: l.selector, source: 'link' as const }));
-    // Buttons that open assistants through onclick/data attributes or scripts.
-    for (const m of ctx.fetch.body.matchAll(AI_LINK_RE)) {
-      const raw = m[0].replace(/&amp;/g, '&');
-      candidates.push({ href: raw, text: '', location: 'page source (script, onclick or data attribute)', source: 'html' });
-    }
-    for (const c of candidates) {
-      const url = resolveUrl(c.href, page.url);
-      if (!url || seen.has(url.href)) continue;
-      const prefill = extractAiPrefill(url);
-      if (!prefill) continue;
-      seen.add(url.href);
+    // AI-004 / AI-005 AI assistant links with prefilled prompts (links, onclick handlers, data attributes, scripts)
+    for (const prefill of collectAiPrefills(page, ctx.fetch.body)) {
+      const c = prefill;
+      const url = prefill.url;
       const a = assessInstructions(prefill.prompt);
       const endorsement = findEndorsementClaims(prefill.prompt);
       const mentionsOwnSite = page.domain ? prefill.prompt.toLowerCase().includes(page.domain) : false;

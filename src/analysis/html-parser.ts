@@ -71,6 +71,8 @@ export interface PageSnapshot {
   scripts: ScriptInfo[];
   iframes: IframeInfo[];
   attributes: AttributeText[];
+  /** data-* attributes (other than data-ai/llm/prompt) with values of 16+ characters, raw. */
+  data_attributes: AttributeText[];
   hidden_elements: HiddenElement[];
   visible_text: string;
   page_hash: string;
@@ -157,18 +159,20 @@ export function parseHtml(html: string, pageUrl: string): PageSnapshot {
   });
 
   const comments: PageSnapshot['comments'] = [];
-  const walkComments = (node: AnyNode, parentSel: string): void => {
+  // The selector is computed only when a comment is found: computing it for every element is
+  // quadratic on pages with many siblings.
+  const walkComments = (node: AnyNode, parent: Element | undefined): void => {
     if (node.type === 'comment') {
       const text = collapse((node as unknown as { data: string }).data ?? '');
-      if (text) comments.push({ location: `HTML comment in ${parentSel || 'document'}`, text });
+      if (text) comments.push({ location: `HTML comment in ${parent ? selectorPath($, parent) : 'document'}`, text });
       return;
     }
     const children = (node as unknown as { children?: AnyNode[] }).children;
     if (!children) return;
-    const sel = node.type === 'tag' ? selectorPath($, node as Element) : parentSel;
-    for (const c of children) walkComments(c, sel);
+    const next = node.type === 'tag' ? (node as Element) : parent;
+    for (const c of children) walkComments(c, next);
   };
-  walkComments($.root()[0] as AnyNode, '');
+  walkComments($.root()[0] as AnyNode, undefined);
 
   const links: LinkInfo[] = [];
   $('a[href], area[href]').each((_, el) => {
@@ -240,6 +244,18 @@ export function parseHtml(html: string, pageUrl: string): PageSnapshot {
     }
   });
 
+  // Every other data-* attribute with a meaningful value: a common carrier for encoded or smuggled payloads.
+  const dataAttributes: AttributeText[] = [];
+  const NAMED = new Set(['data-ai', 'data-llm', 'data-prompt']);
+  for (const el of $('*').toArray()) {
+    if (dataAttributes.length >= 500) break;
+    const e = el as Element;
+    for (const [attribute, value] of Object.entries(e.attribs ?? {})) {
+      if (!attribute.startsWith('data-') || NAMED.has(attribute) || !value || value.trim().length < 16) continue;
+      dataAttributes.push({ selector: selectorPath($, e), attribute, value: value.slice(0, 16_384), hidden: true });
+    }
+  }
+
   const hiddenElements: HiddenElement[] = [];
   const visibleParts: string[] = [];
   for (const [el, v] of vis) {
@@ -288,6 +304,7 @@ export function parseHtml(html: string, pageUrl: string): PageSnapshot {
     scripts,
     iframes,
     attributes,
+    data_attributes: dataAttributes,
     hidden_elements: hiddenElements,
     visible_text: visibleText,
     page_hash: createHash('sha256').update(html).digest('hex'),
