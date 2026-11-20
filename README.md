@@ -167,15 +167,35 @@ The tests cover:
 
 ### Releasing
 
-1. Bump the version in `package.json`, `server.json` (twice) and `SERVER_INFO` in `src/mcp/server.ts`. A test fails if they disagree.
-2. Publish to npm. `prepublishOnly` runs type-check, lint, tests and build first:
+Releases are published by [`.github/workflows/release.yml`](.github/workflows/release.yml) when a GitHub Release is published. It runs type-check, lint, tests and build, checks that the release tag equals `v` + the `package.json` version, publishes to npm with provenance through npm trusted publishing (no `NPM_TOKEN`), waits until npm serves the new version, then publishes `server.json` to the MCP Registry with `mcp-publisher login github-oidc`. [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs the same checks on pull requests and pushes to `main`.
+
+1. Bump the version in `package.json`, `server.json` (`version` and `packages[0].version`) and `SERVER_INFO` in `src/mcp/server.ts`, and add a `CHANGELOG.md` entry. A test fails if the versions disagree.
+2. Open a PR, wait for CI, and merge it into `main`.
+3. Create a GitHub Release on `main` with tag `vX.Y.Z` (for example `v0.2.0`), either in the GitHub UI or with:
    ```bash
-   npm publish
+   gh release create v0.2.0 --target main --title v0.2.0 --generate-notes
    ```
-3. Publish to the MCP Registry:
-   ```bash
-   mcp-publisher login github && mcp-publisher publish
-   ```
+   Publishing the release starts the workflow. If the MCP Registry step fails, re-run the workflow: steps that already succeeded (npm publish, registry publish) are skipped.
+
+Prerelease versions (`X.Y.Z-beta.1`) are published to npm under the `next` dist-tag.
+
+#### One-time setup (npm trusted publisher)
+
+The workflow needs npm to trust it before its first run. On [npmjs.com](https://www.npmjs.com/package/geo-shield-mcp), signed in as the package owner:
+
+1. Open **geo-shield-mcp → Settings → Trusted publishing** and choose **GitHub Actions** under "Select your publisher".
+2. Fill in:
+   - **Organization or user:** `krishnaGauss`
+   - **Repository:** `MCP_WebSafe`
+   - **Workflow filename:** `release.yml` (the filename only, not the path)
+   - **Environment name:** leave empty
+   - **Allowed actions:** tick **npm publish**. New trusted publishers only allow `npm stage publish` by default, and the workflow uses `npm publish`.
+3. Save. A new trusted publisher expires if it isn't used for a successful publish within 2 days, so add it shortly before the first release. If it expires, delete it and add it again.
+4. Optional, once a release has gone through: under **Settings → Publishing access**, choose "Require two-factor authentication and disallow tokens". Trusted publishing keeps working, and manual `npm publish` with 2FA still works.
+
+The MCP Registry needs no setup: `io.github.krishnaGauss/*` names are authorised by the GitHub OIDC token of a workflow in a `krishnaGauss` repository.
+
+To publish by hand instead (needs npm 2FA in the browser): `npm publish` (`prepublishOnly` runs the checks), wait until `npm view geo-shield-mcp@X.Y.Z` shows the version, then `mcp-publisher login github && mcp-publisher publish`.
 
 ## Architecture
 
