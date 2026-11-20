@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { parseHtml, type PageSnapshot } from '../analysis/html-parser.js';
+import { MAX_DATA_ATTRIBUTES, parseHtml, type PageSnapshot } from '../analysis/html-parser.js';
 import { registrableDomain } from '../analysis/url-utils.js';
 import type { Config } from '../config.js';
 import { aiPromptInjectionDetector } from '../detectors/ai-prompt-injection.js';
@@ -162,10 +162,13 @@ export class ScanOrchestrator {
     let page: PageSnapshot | undefined;
     if (fetch.body && isHtml(fetch)) page = parseHtml(fetch.body, fetch.final_url);
     else if (fetch.body) notices.push(`Response content-type "${fetch.content_type}" is not HTML; content detectors were skipped.`);
+    if (page?.data_attributes_truncated) {
+      notices.push(`The page has more than ${MAX_DATA_ATTRIBUTES} data-* attributes; only the first ${MAX_DATA_ATTRIBUTES} were scanned for hidden, obfuscated or encoded instructions.`);
+    }
     if (fetch.truncated) notices.push(`Response body exceeded the size limit and was truncated after ${fetch.body_bytes} bytes; content beyond that point was not analysed.`);
 
     const declaredRedirects = page ? extractDeclaredRedirects(page) : [];
-    const ctx: DetectorContext = { fetch, ...(page ? { page } : {}), declaredRedirects };
+    const ctx: DetectorContext = { fetch, ...(page ? { page } : {}), declaredRedirects, notes: notices };
     const detectors: Detector[] = [];
     if (opts.check_redirects) detectors.push(redirectAbuseDetector);
     if (opts.check_hidden_content) detectors.push(hiddenContentDetector, spamInjectionDetector, bidiOverrideDetector);
